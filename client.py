@@ -4,7 +4,7 @@ from aiohttp import ClientSession
 import random
 import string
 
-MAX_CLIENTS = 3
+MAX_CLIENTS = 1
 
 def generate_client_id(length=8):
     characters = string.ascii_letters + string.digits
@@ -25,15 +25,19 @@ def generate_random_message():
 async def recv_messages(ws, client_id):
     while True:
         try:
-            response = await ws.receive_str()
-            command, resv_client_id, message = response.split('||')
-            
-            if command == 'msg':
-                print(f"[{client_id}]>> {resv_client_id}: {message}")
-            elif command == 'error':
-                print(f"[{client_id}]>> Server error: {message}")
-            else:
-                print(f"[{client_id}]>> Unknown command: {command}")
+            # FIXME: manage illegal format message without doubled try block
+            try:
+                response = await ws.receive_str()
+                command, resv_client_id, message = response.split('||', 2)
+
+                if command == 'msg':
+                    print(f"[{client_id}]>> {resv_client_id}: {message}")
+                elif command == 'error':
+                    print(f"[{client_id}]>> Server error: {message}")
+                else:
+                    print(f"[{client_id}]>> Unknown command: {command}")
+            except Exception as e:
+                pass
         except Exception as e:
             print(f"[{client_id}]>> Error receiving message for client {resv_client_id}: {e}")
             break
@@ -54,12 +58,13 @@ async def client_session():
     
     async with ClientSession() as session:
         async with session.ws_connect('http://localhost:3000/ws') as ws:
+            await ws.send_str(f"connect||{client_id}||hi")
             await asyncio.gather(
                 send_messages(ws, client_id),
                 recv_messages(ws, client_id)
             )
 
-async def main():# Number of simultaneous clients
+async def main():
     clients = [client_session() for _ in range(MAX_CLIENTS)]
     await asyncio.gather(*clients)
 
