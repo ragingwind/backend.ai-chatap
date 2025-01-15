@@ -7,7 +7,7 @@ A simple chat application using WebSocket for real-time communication between cl
 1. Install dependencies:
 
 ```bash
-pip install aiohttp
+pip install -r requirements.txt
 ```
 
 2. Run the server:
