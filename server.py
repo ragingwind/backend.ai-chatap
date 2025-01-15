@@ -82,4 +82,4 @@ async def start_server():
     return app
 
 print(f">> Starting server on port {port}")
-web.run_app(start_server(), port=port)
+web.run_app(start_server(), port=port, reuse_port=True)
