@@ -3,7 +3,7 @@ from aiohttp import ClientSession
 
 async def connect_to_server():
     async with ClientSession() as session:
-        async with session.ws_connect('http://localhost:8080/ws') as ws:
+        async with session.ws_connect('http://localhost:3000/ws') as ws:
             while True:
                 message = input("Enter message (or 'quit' to exit): ")
                 if message.lower() == 'quit':
