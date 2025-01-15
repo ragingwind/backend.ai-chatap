@@ -8,9 +8,18 @@
     <div id="messages"></div>
     <input type="text" id="messageInput" placeholder="Enter message">
     <button onclick="sendMessage()">Send</button>
-
     <script>
-        const ws = new WebSocket('ws://192.168.64.3:3000/ws');
+        function getRemoteAddress() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const host = urlParams.get('host') || window.location.hostname;
+            const port = urlParams.get('port') || window.location.port;
+            return { host, port };
+        }
+    </script>
+    <script>
+        const { host, port } = getRemoteAddress();
+
+        const ws = new WebSocket(`ws://${host}:${port}/ws`);
         const messagesDiv = document.getElementById('messages');
         
         ws.onmessage = function(event) {
