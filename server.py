@@ -12,10 +12,17 @@ async def handle_websocket(request):
         await ws.prepare(request)
         async for msg in ws:
             if msg.type == web.WSMsgType.TEXT:
-                print(f"WebSocket message received from {request.remote}: {msg.data}")
-                for client in ws_connections:
-                    if (client != ws):
-                        await client.send_str(msg.data)
+                try:
+                    command, client_id, message = msg.data.split('||')
+                    print(f"Received command: {command}, client_id: {client_id},message: {message}")
+                    
+                    if command == 'msg':
+                        for client in ws_connections:
+                            await client.send_str(f"msg||{client_id}||{message}")
+                    else:
+                        await ws.send_str(f"error||Unknown command: {command}")
+                except ValueError:
+                    await ws.send_str(f"error||Invalid message format. Use: command||client_id||message")
     finally:
         ws_connections.remove(ws)
         print(f"WebSocket connection closed for {request.remote}")
