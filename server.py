@@ -1,3 +1,5 @@
+import signal
+import asyncio
 from aiohttp import web
 import redis.asyncio as redis
 
@@ -55,6 +57,20 @@ async def handle_websocket(request):
         ws_connections.remove(ws)
         print(f">> WebSocket connection closed for {request.remote}")
     return ws
+
+async def shotdown_server(app):
+    for client in ws_connections:
+        await client.close()
+    await app.shutdown()
+    await app.cleanup()
+    await redis_client.close()
+
+def handle_sigint():
+    print(">> Received SIGINT, shutting down server...")
+    asyncio.get_event_loop().create_task(shotdown_server())
+    asyncio.get_event_loop().stop()
+
+signal.signal(signal.SIGINT, lambda s, f: handle_sigint())
 
 async def start_server():
     await init_redis()
