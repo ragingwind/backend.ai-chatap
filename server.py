@@ -1,7 +1,7 @@
-import signal
-import asyncio
 from aiohttp import web
 import redis.asyncio as redis
+import aiotools
+import os
 
 port = 3000
 ws_connections = set()
@@ -58,28 +58,51 @@ async def handle_websocket(request):
         print(f">> WebSocket connection closed for {request.remote}")
     return ws
 
-async def shotdown_server(app):
-    for client in ws_connections:
-        await client.close()
-    await app.shutdown()
-    await app.cleanup()
-    await redis_client.close()
+async def server_shutdown(app) -> None:
+    print(f">> [{app['pidx']}] Shutting down server")
+    for ws in set(ws_connections):  # Create a copy of the set
+        try:
+            await ws.close(code=1000, message=b'Server shutdown')
+        except Exception as e:
+            print(f"Error closing websocket: {e}")
+    
+    try:
+        await redis_client.aclose()
+        pass
+    except Exception as e:
+        print(f"Error closing Redis: {e}")
+    
+async def server_cleanup(app) -> None:
+    pass
 
-def handle_sigint():
-    print(">> Received SIGINT, shutting down server...")
-    asyncio.get_event_loop().create_task(shotdown_server())
-    asyncio.get_event_loop().stop()
-
-signal.signal(signal.SIGINT, lambda s, f: handle_sigint())
-
-async def start_server():
+@aiotools.server
+async def start_server(loop, pidx, args):
     await init_redis()
 
     app = web.Application()
     app.router.add_get('/ws', handle_websocket)
     app.router.add_get('/', lambda r: web.FileResponse('static/index.html'))
+    app.on_shutdown.append(server_shutdown)
+    app.on_cleanup.append(server_cleanup)
+    app["pidx"] = pidx
 
-    return app
+    runner = web.AppRunner(app)
+    await runner.setup()
 
-print(f">> Starting server on port {port}")
-web.run_app(start_server(), port=port, reuse_port=True)
+    site = web.TCPSite(
+        runner,
+        port=port,
+        backlog=1024,
+        reuse_port=True
+    )
+    await site.start()
+    
+    try:
+        print(f">> [{pidx}] Started server")
+        yield
+    finally:
+        print(f">> [{pidx}] Shutting down server")
+        await runner.cleanup()
+
+if __name__ == '__main__':
+    aiotools.start_server(start_server, num_workers=min(4, os.cpu_count() or 1))
